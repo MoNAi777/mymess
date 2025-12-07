@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "name": "MindBase",
+    "slug": "mindbase",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "scheme": "mindbase",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f0f1a"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-share-intent",
+        {
+          "ios": {
+            "activationRules": {
+              "URL": 1
+            }
+          },
+          "android": {
+            "intentFilters": [
+              {
+                "action": "SEND",
+                "data": {
+                  "mimeType": "text/plain"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mindbase.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0f0f1a"
+      },
+      "package": "com.mindbase.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "4947fa25-ff37-484e-9e00-f8f60be09887"
+      }
+    }
+  }
+}

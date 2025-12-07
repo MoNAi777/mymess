@@ -58,14 +58,38 @@ export default function App() {
 
   useEffect(() => {
     const handleShare = async () => {
-      if (hasShareIntent && shareIntent.type === 'text' && (shareIntent as any).value) {
-        console.log('Received share intent:', (shareIntent as any).value);
+      if (!hasShareIntent) return;
+
+      console.log('Share intent received:', JSON.stringify(shareIntent, null, 2));
+
+      let contentToSave: string | null = null;
+
+      // Handle different share intent types
+      if (shareIntent.type === 'text') {
+        // Plain text share (WhatsApp messages, etc.)
+        contentToSave = (shareIntent as any).value || (shareIntent as any).text;
+      } else if (shareIntent.type === 'weburl') {
+        // URL share (links from browsers, etc.)
+        contentToSave = (shareIntent as any).webUrl || (shareIntent as any).value;
+      } else if (shareIntent.type === 'file' || shareIntent.type === 'media') {
+        // File/media share - save the URI/path
+        const files = (shareIntent as any).files || [];
+        if (files.length > 0) {
+          contentToSave = files[0].path || files[0].uri || JSON.stringify(files[0]);
+        }
+      }
+
+      // Fallback: try to extract any text-like content
+      if (!contentToSave) {
+        const intent = shareIntent as any;
+        contentToSave = intent.text || intent.value || intent.webUrl || intent.uri;
+      }
+
+      if (contentToSave) {
+        console.log('Saving shared content:', contentToSave);
         try {
-          // Auto-save the shared content
-          await api.saveContent((shareIntent as any).value);
-          // Clear intent
+          await api.saveContent(contentToSave);
           resetShareIntent();
-          // Navigate to Home and refresh
           if (navigationRef.isReady()) {
             // @ts-ignore
             navigationRef.navigate('Home', { refresh: Date.now() });
@@ -73,6 +97,9 @@ export default function App() {
         } catch (error) {
           console.error('Failed to save shared content:', error);
         }
+      } else {
+        console.log('No content found in share intent');
+        resetShareIntent();
       }
     };
 

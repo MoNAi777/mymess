@@ -2,7 +2,7 @@
 MindBase Backend - Items API
 Endpoints for saving and managing content
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import List
 from datetime import datetime
 import uuid
@@ -16,12 +16,13 @@ from ..models import (
 )
 from ..services import content_extractor, ai_service
 from ..core.database import supabase
+from .deps import require_user
 
 router = APIRouter(prefix="/items", tags=["Items"])
 
 
 @router.post("/", response_model=SavedItemResponse)
-async def save_item(item: SavedItemCreate):
+async def save_item(item: SavedItemCreate, user = Depends(require_user)):
     """Save new content from share extension or manual input."""
     
     # Extract content metadata
@@ -42,7 +43,7 @@ async def save_item(item: SavedItemCreate):
     
     item_data = {
         "id": item_id,
-        "user_id": "default_user",  # TODO: Get from auth
+        "user_id": user.id,
         "source_platform": (item.source_platform or extracted['source_platform']).value,
         "source_url": extracted.get('source_url'),
         "content_type": extracted['content_type'].value,
@@ -74,12 +75,13 @@ async def save_item(item: SavedItemCreate):
             "description": extracted.get('description'),
             "categories": categories,
             "source_platform": extracted['source_platform'].value,
-        }
+        },
+        user_id=user.id
     )
     
     return SavedItemResponse(
         id=item_id,
-        user_id="default_user",
+        user_id=user.id,
         source_platform=item.source_platform or extracted['source_platform'],
         source_url=extracted.get('source_url'),
         content_type=extracted['content_type'],
@@ -100,10 +102,11 @@ async def get_items(
     offset: int = 0,
     category: str = None,
     platform: SourcePlatform = None,
+    user = Depends(require_user)
 ):
     """Get saved items with optional filtering."""
     try:
-        query = supabase.table("saved_items").select("*").order("created_at", desc=True)
+        query = supabase.table("saved_items").select("*").eq("user_id", user.id).order("created_at", desc=True)
         
         if category:
             query = query.contains("categories", [category])
@@ -137,10 +140,10 @@ async def get_items(
 
 
 @router.get("/{item_id}", response_model=SavedItemResponse)
-async def get_item(item_id: str):
+async def get_item(item_id: str, user = Depends(require_user)):
     """Get a specific saved item."""
     try:
-        result = supabase.table("saved_items").select("*").eq("id", item_id).single().execute()
+        result = supabase.table("saved_items").select("*").eq("id", item_id).eq("user_id", user.id).single().execute()
         item = result.data
         
         return SavedItemResponse(
@@ -163,21 +166,21 @@ async def get_item(item_id: str):
 
 
 @router.delete("/{item_id}")
-async def delete_item(item_id: str):
+async def delete_item(item_id: str, user = Depends(require_user)):
     """Delete a saved item."""
     try:
-        supabase.table("saved_items").delete().eq("id", item_id).execute()
+        supabase.table("saved_items").delete().eq("id", item_id).eq("user_id", user.id).execute()
         return {"message": "Item deleted"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/search", response_model=SearchResponse)
-async def search_items(request: SearchRequest):
+async def search_items(request: SearchRequest, user = Depends(require_user)):
     """Search saved items using AI-powered semantic search with text fallback."""
     
     # Get similar items from vector search
-    similar = await ai_service.search_similar(request.query, limit=request.limit)
+    similar = await ai_service.search_similar(request.query, limit=request.limit, user_id=user.id)
     
     # Get full item details from Supabase
     item_ids = [s["item_id"] for s in similar if s.get("item_id")]
@@ -185,11 +188,11 @@ async def search_items(request: SearchRequest):
     try:
         # If vector search found results, use them
         if item_ids:
-            result = supabase.table("saved_items").select("*").in_("id", item_ids).execute()
+            result = supabase.table("saved_items").select("*").in_("id", item_ids).eq("user_id", user.id).execute()
         else:
             # Fallback to text search in title, description, or categories
             query_lower = request.query.lower()
-            result = supabase.table("saved_items").select("*").execute()
+            result = supabase.table("saved_items").select("*").eq("user_id", user.id).execute()
             # Filter results that match the query
             result.data = [
                 item for item in result.data

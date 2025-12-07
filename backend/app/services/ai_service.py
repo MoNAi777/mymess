@@ -124,7 +124,7 @@ class AIService:
             print(f"Error generating summary: {e}")
             return ""
     
-    async def store_embedding(self, item_id: str, text: str, metadata: Dict[str, Any]):
+    async def store_embedding(self, item_id: str, text: str, metadata: Dict[str, Any], user_id: str = "default_user"):
         """Store content embedding in Qdrant."""
         embedding = await self.generate_embedding(text)
         
@@ -137,6 +137,7 @@ class AIService:
                         vector=embedding,
                         payload={
                             "item_id": item_id,
+                            "user_id": user_id,
                             **metadata
                         }
                     )
@@ -145,16 +146,28 @@ class AIService:
         except Exception as e:
             print(f"Error storing embedding: {e}")
     
-    async def search_similar(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
+    async def search_similar(self, query: str, limit: int = 10, user_id: str = None) -> List[Dict[str, Any]]:
         """Search for similar content using vector similarity."""
         query_embedding = await self.generate_embedding(query)
         
         try:
-            results = qdrant.search(
-                collection_name=COLLECTION_NAME,
-                query_vector=query_embedding,
-                limit=limit
-            )
+            search_params = {
+                "collection_name": COLLECTION_NAME,
+                "query_vector": query_embedding,
+                "limit": limit
+            }
+            
+            if user_id:
+                search_params["query_filter"] = Filter(
+                    must=[
+                        FieldCondition(
+                            key="user_id",
+                            match=MatchValue(value=user_id)
+                        )
+                    ]
+                )
+            
+            results = qdrant.search(**search_params)
             
             return [
                 {

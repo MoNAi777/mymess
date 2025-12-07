@@ -4,6 +4,7 @@
 services:
   - type: web
     name: mindbase-api
+    rootDir: backend
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt

@@ -19,7 +19,9 @@
         {
           "ios": {
             "activationRules": {
-              "URL": 1
+              "NSExtensionActivationSupportsWebURLWithMaxCount": 1,
+              "NSExtensionActivationSupportsText": true,
+              "NSExtensionActivationSupportsWebPageWithMaxCount": 1
             }
           },
           "android": {
@@ -28,6 +30,36 @@
                 "action": "SEND",
                 "data": {
                   "mimeType": "text/plain"
+                }
+              },
+              {
+                "action": "SEND",
+                "data": {
+                  "mimeType": "text/*"
+                }
+              },
+              {
+                "action": "SEND",
+                "data": {
+                  "mimeType": "image/*"
+                }
+              },
+              {
+                "action": "SEND",
+                "data": {
+                  "mimeType": "video/*"
+                }
+              },
+              {
+                "action": "SEND",
+                "data": {
+                  "mimeType": "*/*"
+                }
+              },
+              {
+                "action": "SEND_MULTIPLE",
+                "data": {
+                  "mimeType": "*/*"
                 }
               }
             ]

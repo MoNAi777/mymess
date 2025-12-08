@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { useShareIntent } from 'expo-share-intent';
 import { Session } from '@supabase/supabase-js';
 
@@ -60,7 +60,8 @@ export default function App() {
     const handleShare = async () => {
       if (!hasShareIntent) return;
 
-      console.log('Share intent received:', JSON.stringify(shareIntent, null, 2));
+      // Show what we received for debugging
+      Alert.alert('Share Received', `Type: ${shareIntent.type}\nData: ${JSON.stringify(shareIntent).substring(0, 200)}`);
 
       let contentToSave: string | null = null;
 
@@ -86,25 +87,29 @@ export default function App() {
       }
 
       if (contentToSave) {
-        console.log('Saving shared content:', contentToSave);
+        Alert.alert('Content Found', `Saving: ${contentToSave.substring(0, 100)}...`);
         try {
           await api.saveContent(contentToSave);
+          Alert.alert('Success!', 'Content saved to MindBase');
           resetShareIntent();
           if (navigationRef.isReady()) {
             // @ts-ignore
             navigationRef.navigate('Home', { refresh: Date.now() });
           }
-        } catch (error) {
-          console.error('Failed to save shared content:', error);
+        } catch (error: any) {
+          Alert.alert('Error Saving', `Failed: ${error?.message || String(error)}`);
         }
       } else {
-        console.log('No content found in share intent');
+        Alert.alert('No Content', 'Could not extract content from share');
         resetShareIntent();
       }
     };
 
     if (session) {
       handleShare();
+    } else if (hasShareIntent) {
+      // User not logged in but tried to share
+      Alert.alert('Login Required', 'Please login to save shared content');
     }
   }, [hasShareIntent, shareIntent, resetShareIntent, navigationRef, session]);
 

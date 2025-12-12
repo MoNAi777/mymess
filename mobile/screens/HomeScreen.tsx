@@ -1,6 +1,6 @@
 /**
  * MindBase - Home Screen
- * Shows saved items feed
+ * Shows saved items feed with FAB for clipboard paste
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -12,8 +12,12 @@ import {
     Image,
     StyleSheet,
     Linking,
+    Alert,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import { api, SavedItem, Category } from '../api';
+import SaveDialog from '../components/SaveDialog';
+import { useBubble } from '../contexts/BubbleContext';
 
 const platformColors: Record<string, string> = {
     youtube: '#FF0000',
@@ -70,6 +74,13 @@ export default function HomeScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [loading, setLoading] = useState(true);
 
+    // Clipboard FAB state
+    const [showSaveDialog, setShowSaveDialog] = useState(false);
+    const [clipboardContent, setClipboardContent] = useState('');
+
+    // Bubble context
+    const { showBubbleSettings } = useBubble();
+
     const loadData = useCallback(async () => {
         try {
             const [itemsData, categoriesData] = await Promise.all([
@@ -101,9 +112,56 @@ export default function HomeScreen() {
         }
     };
 
+    // FAB: Read clipboard and show save dialog
+    const handleFabPress = async () => {
+        try {
+            const content = await Clipboard.getString();
+            if (content && content.trim()) {
+                setClipboardContent(content.trim());
+                setShowSaveDialog(true);
+            } else {
+                Alert.alert('Empty Clipboard', 'Copy some text or a link first, then tap the + button to save it.');
+            }
+        } catch (error) {
+            Alert.alert('Clipboard Error', 'Could not read clipboard. Please try again.');
+        }
+    };
+
+    // Save content from clipboard
+    const handleSaveFromClipboard = async (notes?: string) => {
+        try {
+            await api.saveContent(clipboardContent, notes);
+            setShowSaveDialog(false);
+            setClipboardContent('');
+            Alert.alert('Saved!', 'Content saved to MindBase');
+            loadData(); // Refresh the list
+        } catch (error: any) {
+            Alert.alert('Save Failed', error?.message || 'Could not save content.');
+            throw error;
+        }
+    };
+
+    const handleCancelSave = () => {
+        setShowSaveDialog(false);
+        setClipboardContent('');
+    };
+
+    // Determine content type from clipboard
+    const getContentType = (): 'text' | 'url' | 'file' => {
+        if (clipboardContent.startsWith('http://') || clipboardContent.startsWith('https://')) {
+            return 'url';
+        }
+        return 'text';
+    };
+
     const renderHeader = () => (
         <View style={styles.header}>
-            <Text style={styles.headerTitle}>MindBase</Text>
+            <View style={styles.headerRow}>
+                <Text style={styles.headerTitle}>MindBase</Text>
+                <TouchableOpacity style={styles.settingsButton} onPress={showBubbleSettings}>
+                    <Text style={styles.settingsIcon}>⚙️</Text>
+                </TouchableOpacity>
+            </View>
             <Text style={styles.headerSubtitle}>
                 {items.length} saved items
             </Text>
@@ -155,11 +213,25 @@ export default function HomeScreen() {
                     <View style={styles.emptyContainer}>
                         <Text style={styles.emptyTitle}>No saved items yet</Text>
                         <Text style={styles.emptySubtitle}>
-                            Share links from any app to save them here
+                            Share links from any app or tap + to paste from clipboard
                         </Text>
                     </View>
                 }
                 contentContainerStyle={styles.listContent}
+            />
+
+            {/* Floating Action Button */}
+            <TouchableOpacity style={styles.fab} onPress={handleFabPress} activeOpacity={0.8}>
+                <Text style={styles.fabIcon}>+</Text>
+            </TouchableOpacity>
+
+            {/* Save Dialog for clipboard content */}
+            <SaveDialog
+                visible={showSaveDialog}
+                content={clipboardContent}
+                contentType={getContentType()}
+                onSave={handleSaveFromClipboard}
+                onCancel={handleCancelSave}
             />
         </View>
     );
@@ -174,10 +246,21 @@ const styles = StyleSheet.create({
         padding: 20,
         paddingTop: 60,
     },
+    headerRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
     headerTitle: {
         fontSize: 32,
         fontWeight: 'bold',
         color: '#fff',
+    },
+    settingsButton: {
+        padding: 8,
+    },
+    settingsIcon: {
+        fontSize: 24,
     },
     headerSubtitle: {
         fontSize: 14,
@@ -279,5 +362,27 @@ const styles = StyleSheet.create({
         color: '#888',
         textAlign: 'center',
         marginTop: 8,
+    },
+    fab: {
+        position: 'absolute',
+        right: 20,
+        bottom: 100,
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: '#6366f1',
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 8,
+        shadowColor: '#6366f1',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.4,
+        shadowRadius: 8,
+    },
+    fabIcon: {
+        fontSize: 32,
+        color: '#fff',
+        fontWeight: '300',
+        marginTop: -2,
     },
 });

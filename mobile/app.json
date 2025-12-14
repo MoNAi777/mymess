@@ -14,6 +14,7 @@
     },
     "plugins": [
       "expo-router",
+      "./plugins/withFloatingBubble",
       [
         "expo-share-intent",
         {

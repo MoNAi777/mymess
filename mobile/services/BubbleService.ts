@@ -1,20 +1,22 @@
 /**
- * MindBase - Floating Bubble Service (Stub)
+ * MindBase - Floating Bubble Service
  *
- * NOTE: The floating bubble native package has compatibility issues.
- * This is a stub that gracefully indicates the feature is unavailable.
- * The bubble feature can be added later when a working package is found.
+ * NOTE: Floating bubble libraries have compatibility issues with Expo SDK 54.
+ * The infrastructure (permissions, config plugin) is in place for when a
+ * compatible library becomes available.
+ *
+ * Current status: Feature stub - shows "Coming Soon" message
  */
-import { Platform, Alert } from 'react-native';
+import { Platform, Alert, Linking } from 'react-native';
 
 class BubbleService {
   private onTapCallback: (() => void) | null = null;
 
   /**
-   * Initialize - always returns false (feature not available)
+   * Initialize - feature not yet available
    */
   async init(): Promise<boolean> {
-    console.log('BubbleService: Floating bubble not available (native package removed due to compatibility issues)');
+    console.log('BubbleService: Floating bubble coming soon (waiting for compatible library)');
     return false;
   }
 
@@ -23,10 +25,7 @@ class BubbleService {
   }
 
   async requestPermission(): Promise<boolean> {
-    Alert.alert(
-      'Coming Soon',
-      'Floating bubble feature is not yet available. Use the + button in the app to save clipboard content.'
-    );
+    this.showComingSoonMessage();
     return false;
   }
 
@@ -47,13 +46,38 @@ class BubbleService {
       this.onTapCallback();
     }
   }
+
+  isAvailable(): boolean {
+    return false;
+  }
+
+  private showComingSoonMessage(): void {
+    Alert.alert(
+      'Floating Bubble - Coming Soon',
+      'The floating bubble feature is being developed.\n\nIn the meantime, use:\n• Share button from any app\n• + button to paste from clipboard',
+      [{ text: 'OK' }]
+    );
+  }
+
+  cleanup(): void {
+    // No-op for stub
+  }
 }
 
 export const bubbleService = new BubbleService();
 
+/**
+ * Open Android overlay settings
+ */
 export const openOverlaySettings = async () => {
-  Alert.alert(
-    'Coming Soon',
-    'Floating bubble feature is not yet available. Use the + button in the app to save clipboard content.'
-  );
+  if (Platform.OS !== 'android') {
+    Alert.alert('Not Available', 'Floating bubble is only available on Android');
+    return;
+  }
+
+  try {
+    await Linking.openSettings();
+  } catch (error) {
+    Alert.alert('Error', 'Could not open settings');
+  }
 };

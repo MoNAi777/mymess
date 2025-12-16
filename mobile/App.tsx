@@ -5,7 +5,8 @@ import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, StyleSheet, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Alert, Platform, Linking } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useShareIntent } from 'expo-share-intent';
 import { Session } from '@supabase/supabase-js';
 import Clipboard from '@react-native-clipboard/clipboard';
@@ -93,23 +94,11 @@ export default function App() {
         setBubbleAvailable(initialized);
 
         if (initialized) {
-          // Set up callback for when bubble is tapped
-          bubbleService.onTap(async () => {
-            // Read clipboard and show save dialog
-            try {
-              const content = await Clipboard.getString();
-              if (content && content.trim()) {
-                const isUrl = content.startsWith('http://') || content.startsWith('https://');
-                setPendingContent({
-                  content: content.trim(),
-                  contentType: isUrl ? 'url' : 'text',
-                });
-                setShowSaveDialog(true);
-              }
-            } catch (err) {
-              console.error('Failed to read clipboard from bubble tap', err);
-            }
-          });
+          // Load saved bubble state
+          const savedState = await AsyncStorage.getItem('bubbleEnabled');
+          if (savedState === 'true') {
+            setBubbleEnabled(true);
+          }
         }
       } catch (error) {
         console.log('Bubble service initialization failed (expected in Expo Go)');
@@ -118,17 +107,56 @@ export default function App() {
     };
 
     initBubble();
+
+    // Listen for bubble tap intent (deep link)
+    const handleBubbleTap = async (event: { url: string }) => {
+      if (event.url && event.url.includes('BUBBLE_TAP')) {
+        // Read clipboard and show save dialog
+        try {
+          const content = await Clipboard.getString();
+          if (content && content.trim()) {
+            const isUrl = content.startsWith('http://') || content.startsWith('https://');
+            setPendingContent({
+              content: content.trim(),
+              contentType: isUrl ? 'url' : 'text',
+            });
+            setShowSaveDialog(true);
+          } else {
+            Alert.alert('Clipboard Empty', 'Nothing to save. Copy some text first!');
+          }
+        } catch (err) {
+          console.error('Failed to read clipboard from bubble tap', err);
+        }
+      }
+    };
+
+    // Check if app was opened by bubble tap
+    Linking.getInitialURL().then((url) => {
+      if (url) handleBubbleTap({ url });
+    });
+
+    // Listen for future bubble taps
+    const subscription = Linking.addEventListener('url', handleBubbleTap);
+    return () => subscription.remove();
   }, []);
 
   // Toggle bubble visibility when bubbleEnabled changes
   useEffect(() => {
     if (!bubbleAvailable || !bubbleService) return;
 
-    if (bubbleEnabled) {
-      bubbleService.show();
-    } else {
-      bubbleService.hide();
-    }
+    const updateBubble = async () => {
+      // Save state
+      await AsyncStorage.setItem('bubbleEnabled', bubbleEnabled ? 'true' : 'false');
+
+      // Show or hide bubble
+      if (bubbleEnabled) {
+        bubbleService.show();
+      } else {
+        bubbleService.hide();
+      }
+    };
+
+    updateBubble();
   }, [bubbleEnabled, bubbleAvailable]);
 
   useEffect(() => {

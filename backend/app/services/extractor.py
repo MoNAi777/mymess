@@ -62,6 +62,12 @@ class ContentExtractor:
         """Check if content is a URL."""
         url_pattern = r'^https?://[^\s]+'
         return bool(re.match(url_pattern, content.strip()))
+
+    def extract_url(self, content: str) -> Optional[str]:
+        """Extract first URL from content (even if mixed with text)."""
+        url_pattern = r'https?://[^\s<>"\')\]]+'
+        match = re.search(url_pattern, content)
+        return match.group(0) if match else None
     
     async def extract_metadata(self, url: str) -> Dict[str, Any]:
         """Extract metadata from a URL."""
@@ -119,12 +125,13 @@ class ContentExtractor:
     
     async def process_content(self, content: str) -> Dict[str, Any]:
         """Process incoming content (URL or text) and extract information."""
+        # Check if content is a pure URL
         if self.is_url(content):
             url = content.strip()
             platform = self.detect_platform(url)
             content_type = self.detect_content_type(url, platform)
             metadata = await self.extract_metadata(url)
-            
+
             return {
                 'source_url': url,
                 'source_platform': platform,
@@ -132,18 +139,37 @@ class ContentExtractor:
                 'raw_content': content,
                 **metadata,
             }
-        else:
-            # Plain text content
+
+        # Check if content contains a URL (e.g., WhatsApp message with link)
+        embedded_url = self.extract_url(content)
+        if embedded_url:
+            platform = self.detect_platform(embedded_url)
+            content_type = self.detect_content_type(embedded_url, platform)
+            metadata = await self.extract_metadata(embedded_url)
+
+            # Use the full message as context but still extract URL metadata
             return {
-                'source_url': None,
-                'source_platform': SourcePlatform.GENERIC,
-                'content_type': ContentType.TEXT,
-                'raw_content': content,
-                'title': content[:100] + '...' if len(content) > 100 else content,
-                'description': None,
-                'thumbnail_url': None,
-                'extracted_text': content,
+                'source_url': embedded_url,
+                'source_platform': platform,
+                'content_type': content_type,
+                'raw_content': content,  # Keep full message
+                'title': metadata.get('title') or content[:100],
+                'description': metadata.get('description') or content[:200],
+                'thumbnail_url': metadata.get('thumbnail_url'),
+                'extracted_text': f"{content}\n\n{metadata.get('extracted_text', '')}".strip(),
             }
+
+        # Plain text content (no URL found)
+        return {
+            'source_url': None,
+            'source_platform': SourcePlatform.GENERIC,
+            'content_type': ContentType.TEXT,
+            'raw_content': content,
+            'title': content[:100] + '...' if len(content) > 100 else content,
+            'description': None,
+            'thumbnail_url': None,
+            'extracted_text': content,
+        }
 
 
 # Singleton instance

@@ -102,6 +102,18 @@ class ApiService {
     async deleteItem(id: string): Promise<void> {
         return this.fetch(`/items/${id}`, { method: 'DELETE' });
     }
+
+    // Upload image from base64
+    async uploadImage(imageBase64: string, contentType: string = 'image/png', notes?: string): Promise<SavedItem> {
+        return this.fetch('/upload/image-base64', {
+            method: 'POST',
+            body: JSON.stringify({
+                image_data: imageBase64,
+                content_type: contentType,
+                notes: notes
+            }),
+        });
+    }
 }
 
 export const api = new ApiService();

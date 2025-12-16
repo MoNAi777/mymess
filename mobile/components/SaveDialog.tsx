@@ -14,6 +14,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
 } from 'react-native';
 
 interface SaveDialogProps {
@@ -51,15 +52,25 @@ export default function SaveDialog({
 
   // Determine content preview
   const isUrl = contentType === 'url' || content.startsWith('http');
-  const previewText = content.length > 200
-    ? content.substring(0, 200) + '...'
-    : content;
+  const isImage = contentType === 'file' && (content.startsWith('data:image') || content.length > 500);
+  const previewText = isImage
+    ? 'Image from clipboard'
+    : content.length > 200
+      ? content.substring(0, 200) + '...'
+      : content;
 
   // Get icon based on content type
   const getIcon = () => {
+    if (isImage) return '🖼️';
     if (isUrl) return '🔗';
     if (contentType === 'file') return '📎';
     return '📝';
+  };
+
+  // Get image URI for preview
+  const getImageUri = () => {
+    if (content.startsWith('data:')) return content;
+    return `data:image/png;base64,${content}`;
   };
 
   return (
@@ -86,12 +97,20 @@ export default function SaveDialog({
               <View style={styles.previewHeader}>
                 <Text style={styles.previewIcon}>{getIcon()}</Text>
                 <Text style={styles.previewLabel}>
-                  {isUrl ? 'Link' : contentType === 'file' ? 'File' : 'Text'}
+                  {isImage ? 'Image' : isUrl ? 'Link' : contentType === 'file' ? 'File' : 'Text'}
                 </Text>
               </View>
-              <Text style={styles.previewText} numberOfLines={5}>
-                {previewText}
-              </Text>
+              {isImage ? (
+                <Image
+                  source={{ uri: getImageUri() }}
+                  style={styles.previewImage}
+                  resizeMode="contain"
+                />
+              ) : (
+                <Text style={styles.previewText} numberOfLines={5}>
+                  {previewText}
+                </Text>
+              )}
             </View>
 
             {/* Notes Input */}
@@ -205,6 +224,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#aaa',
     lineHeight: 20,
+  },
+  previewImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    backgroundColor: '#2a2a3e',
   },
   inputSection: {
     marginTop: 20,

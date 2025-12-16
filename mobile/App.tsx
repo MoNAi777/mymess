@@ -111,7 +111,24 @@ export default function App() {
     // Listen for bubble tap intent (deep link)
     const handleBubbleTap = async (event: { url: string }) => {
       if (event.url && event.url.includes('BUBBLE_TAP')) {
-        // Read clipboard and show save dialog
+        try {
+          // First try to get image from clipboard
+          const imageData = await Clipboard.getImage();
+          if (imageData && imageData.length > 0) {
+            // Found an image in clipboard
+            setPendingContent({
+              content: imageData,
+              contentType: 'file', // 'file' indicates image
+            });
+            setShowSaveDialog(true);
+            return;
+          }
+        } catch (imgErr) {
+          // No image in clipboard, try text
+          console.log('No image in clipboard, trying text');
+        }
+
+        // Try to get text from clipboard
         try {
           const content = await Clipboard.getString();
           if (content && content.trim()) {
@@ -122,10 +139,11 @@ export default function App() {
             });
             setShowSaveDialog(true);
           } else {
-            Alert.alert('Clipboard Empty', 'Nothing to save. Copy some text first!');
+            Alert.alert('Clipboard Empty', 'Copy some text, link, or image first!');
           }
         } catch (err) {
           console.error('Failed to read clipboard from bubble tap', err);
+          Alert.alert('Clipboard Error', 'Could not read clipboard');
         }
       }
     };
@@ -216,7 +234,17 @@ export default function App() {
     if (!pendingContent) return;
 
     try {
-      await api.saveContent(pendingContent.content, notes);
+      // Check if content is an image (base64)
+      const isImage = pendingContent.contentType === 'file' &&
+        (pendingContent.content.startsWith('data:image') || pendingContent.content.length > 500);
+
+      if (isImage) {
+        // Upload image
+        await api.uploadImage(pendingContent.content, 'image/png', notes);
+      } else {
+        // Save text/URL content
+        await api.saveContent(pendingContent.content, notes);
+      }
       setShowSaveDialog(false);
       setPendingContent(null);
       resetShareIntent();

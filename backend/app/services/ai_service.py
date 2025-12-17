@@ -3,7 +3,7 @@ MindBase Backend - AI Service
 Handles categorization, embeddings, and chat using Groq
 """
 from typing import List, Dict, Any, Optional
-from qdrant_client.models import Distance, VectorParams, PointStruct
+from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
 import uuid
 
 from ..core.database import groq, qdrant

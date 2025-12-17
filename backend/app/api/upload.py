@@ -10,7 +10,7 @@ from datetime import datetime
 
 from ..core.database import supabase
 from ..services import ai_service
-from ..models import SavedItemResponse, SourcePlatform, ContentType
+from ..models import SavedItemResponse, SourcePlatform, ContentType, ImageUploadRequest
 from .deps import require_user
 
 router = APIRouter(prefix="/upload", tags=["Upload"])
@@ -142,12 +142,13 @@ async def upload_image(
 
 @router.post("/image-base64", response_model=SavedItemResponse)
 async def upload_image_base64(
-    image_data: str,
-    content_type: str = "image/png",
-    notes: Optional[str] = None,
+    request: ImageUploadRequest,
     user=Depends(require_user)
 ):
     """Upload an image from base64 data (for clipboard images)."""
+    image_data = request.image_data
+    content_type = request.content_type
+    notes = request.notes
 
     try:
         # Decode base64

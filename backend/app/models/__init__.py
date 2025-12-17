@@ -10,4 +10,5 @@ from .schemas import (
     ChatResponse,
     SearchRequest,
     SearchResponse,
+    ImageUploadRequest,
 )

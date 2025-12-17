@@ -91,3 +91,10 @@ class SearchResponse(BaseModel):
     """Response model for search."""
     items: List[SavedItemResponse]
     total: int
+
+
+class ImageUploadRequest(BaseModel):
+    """Request model for base64 image upload."""
+    image_data: str
+    content_type: str = "image/png"
+    notes: Optional[str] = None

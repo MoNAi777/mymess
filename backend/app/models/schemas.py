@@ -48,6 +48,7 @@ class SavedItemResponse(BaseModel):
     extracted_text: Optional[str] = None
     ai_summary: Optional[str] = None
     categories: List[str] = []
+    is_starred: bool = False
     created_at: datetime
     updated_at: Optional[datetime] = None
 

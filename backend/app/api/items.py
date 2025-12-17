@@ -130,6 +130,7 @@ async def get_items(
                 extracted_text=item.get("extracted_text"),
                 ai_summary=item.get("ai_summary"),
                 categories=item.get("categories", []),
+                is_starred=item.get("is_starred", False),
                 created_at=datetime.fromisoformat(item["created_at"].replace("Z", "+00:00")),
             )
             for item in result.data
@@ -159,6 +160,7 @@ async def get_item(item_id: str, user = Depends(require_user)):
             extracted_text=item.get("extracted_text"),
             ai_summary=item.get("ai_summary"),
             categories=item.get("categories", []),
+            is_starred=item.get("is_starred", False),
             created_at=datetime.fromisoformat(item["created_at"].replace("Z", "+00:00")),
         )
     except Exception as e:
@@ -171,6 +173,23 @@ async def delete_item(item_id: str, user = Depends(require_user)):
     try:
         supabase.table("saved_items").delete().eq("id", item_id).eq("user_id", user.id).execute()
         return {"message": "Item deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/{item_id}/star")
+async def toggle_star(item_id: str, user = Depends(require_user)):
+    """Toggle star/favorite status of an item."""
+    try:
+        # Get current star status
+        result = supabase.table("saved_items").select("is_starred").eq("id", item_id).eq("user_id", user.id).single().execute()
+        current_starred = result.data.get("is_starred", False) if result.data else False
+
+        # Toggle the status
+        new_starred = not current_starred
+        supabase.table("saved_items").update({"is_starred": new_starred}).eq("id", item_id).eq("user_id", user.id).execute()
+
+        return {"is_starred": new_starred}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -216,6 +235,7 @@ async def search_items(request: SearchRequest, user = Depends(require_user)):
                 extracted_text=item.get("extracted_text"),
                 ai_summary=item.get("ai_summary"),
                 categories=item.get("categories", []),
+                is_starred=item.get("is_starred", False),
                 created_at=datetime.fromisoformat(item["created_at"].replace("Z", "+00:00")),
             )
             for item in result.data

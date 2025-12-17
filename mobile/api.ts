@@ -14,6 +14,7 @@ export interface SavedItem {
     raw_content: string;
     ai_summary?: string;
     categories: string[];
+    is_starred?: boolean;
     created_at: string;
 }
 
@@ -101,6 +102,11 @@ class ApiService {
     // Delete item
     async deleteItem(id: string): Promise<void> {
         return this.fetch(`/items/${id}`, { method: 'DELETE' });
+    }
+
+    // Toggle star/favorite
+    async toggleStar(id: string): Promise<{ is_starred: boolean }> {
+        return this.fetch(`/items/${id}/star`, { method: 'PATCH' });
     }
 
     // Upload image from base64

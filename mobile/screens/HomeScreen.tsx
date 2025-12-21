@@ -126,8 +126,10 @@ export default function HomeScreen() {
 
     const loadData = useCallback(async () => {
         try {
+            // Don't pass 'starred' to API - it's a client-side filter
+            const categoryFilter = selectedCategory === 'starred' ? undefined : selectedCategory;
             const [itemsData, categoriesData] = await Promise.all([
-                api.getItems(50, selectedCategory || undefined),
+                api.getItems(50, categoryFilter || undefined),
                 api.getCategories(),
             ]);
             setItems(itemsData);

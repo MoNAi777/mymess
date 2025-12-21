@@ -247,3 +247,13 @@ async def search_items(request: SearchRequest, user = Depends(require_user)):
         print(f"Error in search: {e}")
         return SearchResponse(items=[], total=0)
 
+
+@router.post("/reindex")
+async def reindex_embeddings(user = Depends(require_user)):
+    """Re-index all items with new Jina AI embeddings."""
+    try:
+        result = supabase.table("saved_items").select("*").eq("user_id", user.id).execute()
+        count = await ai_service.reindex_all_items(result.data)
+        return {"message": f"Reindexed {count} items", "count": count}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

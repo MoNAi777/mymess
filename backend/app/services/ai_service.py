@@ -64,29 +64,25 @@ class AIService:
             )
             features = [float(x.strip()) for x in response.choices[0].message.content.strip().split(",")[:32]]
             return [features[i % len(features)] for i in range(EMBEDDING_DIM)]
-        except:
+        except Exception:
             import hashlib
             h = hashlib.sha256(text.encode()).digest()
             return [(h[i % len(h)] / 255.0) - 0.5 for i in range(EMBEDDING_DIM)]
 
     async def categorize_content(self, content: str, title: Optional[str] = None) -> List[str]:
-        context = f"Title: {title}
-
-" if title else ""
+        context = f"Title: {title}\n\n" if title else ""
         context += f"Content: {content[:2000]}"
         try:
             response = groq.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[
                     {"role": "system", "content": "Return 1-3 category labels like Technology, AI, Tutorial. ONLY comma-separated categories."},
-                    {"role": "user", "content": f"Categorize:
-
-{context}"}
+                    {"role": "user", "content": f"Categorize:\n\n{context}"}
                 ],
                 max_tokens=50, temperature=0.3
             )
             return [c.strip() for c in response.choices[0].message.content.strip().split(",")][:3]
-        except:
+        except Exception:
             return ["Uncategorized"]
 
     async def generate_summary(self, content: str) -> str:
@@ -97,7 +93,7 @@ class AIService:
                 max_tokens=100, temperature=0.3
             )
             return response.choices[0].message.content.strip()
-        except:
+        except Exception:
             return ""
 
     async def store_embedding(self, item_id: str, text: str, metadata: Dict[str, Any], user_id: str = "default_user"):
@@ -117,7 +113,7 @@ class AIService:
                 params["query_filter"] = Filter(must=[FieldCondition(key="user_id", match=MatchValue(value=user_id))])
             results = qdrant.search(**params)
             return [{"item_id": r.payload.get("item_id"), "score": r.score, **r.payload} for r in results]
-        except:
+        except Exception:
             return []
 
     async def reindex_all_items(self, items: List[Dict[str, Any]]) -> int:
@@ -132,18 +128,14 @@ class AIService:
     async def chat(self, message: str, history: List[ChatMessage], context_items: List[Dict[str, Any]] = None) -> str:
         context = ""
         if context_items:
-            context = "
-
-Relevant content:
-" + "
-".join([f"- {i.get('title', '')}: {i.get('description', '')[:200]}" for i in context_items[:5]])
+            context = "\n\nRelevant content:\n" + "\n".join([f"- {i.get('title', '')}: {i.get('description', '')[:200]}" for i in context_items[:5]])
         messages = [{"role": "system", "content": f"You are MindBase AI, helping users find saved content.{context}"}]
         messages.extend([{"role": m.role, "content": m.content} for m in history[-10:]])
         messages.append({"role": "user", "content": message})
         try:
             response = groq.chat.completions.create(model="llama-3.3-70b-versatile", messages=messages, max_tokens=500, temperature=0.7)
             return response.choices[0].message.content.strip()
-        except:
+        except Exception:
             return "Error processing request."
 
 

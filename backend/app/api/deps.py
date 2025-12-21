@@ -21,25 +21,19 @@ class DevUser:
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     """Verify JWT token with Supabase or use dev mode."""
-    # Development mode - accept test-token
-    if DEV_MODE and token == "test-token":
+    # Development mode - always return DevUser for testing
+    if DEV_MODE:
         return DevUser()
 
     if not token:
-        if DEV_MODE:
-            return DevUser()
         return None
 
     try:
         user_response = supabase.auth.get_user(token)
         if not user_response or not user_response.user:
-            if DEV_MODE:
-                return DevUser()
             return None
         return user_response.user
     except Exception:
-        if DEV_MODE:
-            return DevUser()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",

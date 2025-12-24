@@ -33,9 +33,15 @@ export interface ChatMessage {
 class ApiService {
     private baseUrl = API_URL;
     private token: string | null = null;
+    private deviceId: string | null = null;
 
     setToken(token: string) {
         this.token = token;
+    }
+
+    // Set unique device ID for user isolation
+    setDeviceId(deviceId: string) {
+        this.deviceId = deviceId;
     }
 
     private async fetch(endpoint: string, options?: RequestInit) {
@@ -44,8 +50,11 @@ class ApiService {
             ...options?.headers as any,
         };
 
+        // Use device ID for user isolation when no auth token
         if (this.token) {
             headers['Authorization'] = `Bearer ${this.token}`;
+        } else if (this.deviceId) {
+            headers['Authorization'] = `Bearer device_${this.deviceId}`;
         }
 
         const response = await fetch(`${this.baseUrl}${endpoint}`, {

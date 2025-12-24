@@ -63,22 +63,68 @@ export default function App() {
   const [bubbleAvailable, setBubbleAvailable] = useState(false);
   const [showBubbleSettings, setShowBubbleSettings] = useState(false);
 
+  // DEV MODE: Skip Supabase auth but use unique device ID for data isolation
+  const DEV_MODE = true;
+
+  // Generate or retrieve unique device ID for user isolation
+  const initializeDeviceId = async () => {
+    try {
+      let deviceId = await AsyncStorage.getItem('deviceId');
+      if (!deviceId) {
+        // Generate a UUID-like unique ID
+        deviceId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+          const r = Math.random() * 16 | 0;
+          const v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
+        await AsyncStorage.setItem('deviceId', deviceId);
+        console.log('Generated new device ID:', deviceId);
+      } else {
+        console.log('Using existing device ID:', deviceId);
+      }
+      // Set device ID on API for user isolation
+      api.setDeviceId(deviceId);
+      return deviceId;
+    } catch (error) {
+      console.error('Failed to initialize device ID:', error);
+      // Fallback to a random ID if AsyncStorage fails
+      const fallbackId = Math.random().toString(36).substring(2, 15);
+      api.setDeviceId(fallbackId);
+      return fallbackId;
+    }
+  };
+
   useEffect(() => {
-    // Check initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const initAuth = async () => {
+      // Always initialize device ID first (for user isolation)
+      const deviceId = await initializeDeviceId();
+
+      if (DEV_MODE) {
+        // Skip Supabase auth but use unique device ID
+        setSession({ user: { id: deviceId } } as any);
+        setLoading(false);
+        return;
+      }
+
+      // Normal Supabase auth check
+      const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
       if (session) api.setToken(session.access_token);
       setLoading(false);
-    });
+    };
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) api.setToken(session.access_token);
-      else api.setToken('');
-    });
+    initAuth();
 
-    return () => subscription.unsubscribe();
+    if (!DEV_MODE) {
+      // Listen for auth changes only in non-DEV mode
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        setSession(session);
+        if (session) api.setToken(session.access_token);
+        else api.setToken("");
+      });
+
+      return () => subscription.unsubscribe();
+    }
   }, []);
 
   // Initialize floating bubble service (Android only, dev build only)

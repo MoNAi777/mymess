@@ -127,16 +127,39 @@ class AIService:
 
     async def chat(self, message: str, history: List[ChatMessage], context_items: List[Dict[str, Any]] = None) -> str:
         context = ""
-        if context_items:
-            context = "\n\nRelevant content:\n" + "\n".join([f"- {i.get('title', '')}: {i.get('description', '')[:200]}" for i in context_items[:5]])
-        messages = [{"role": "system", "content": f"You are MindBase AI, helping users find saved content.{context}"}]
+        if context_items and len(context_items) > 0:
+            context_parts = []
+            for i, item in enumerate(context_items[:5], 1):
+                title = item.get('title', 'Untitled')
+                summary = item.get('ai_summary', '')
+                extracted = item.get('extracted_text', '')[:300] if item.get('extracted_text') else ''
+                description = item.get('description', '')[:200] if item.get('description') else ''
+                categories = ', '.join(item.get('categories', [])) if item.get('categories') else ''
+                platform = item.get('source_platform', '')
+
+                content_preview = summary or extracted or description or 'No content preview'
+                context_parts.append(f"{i}. [{platform}] {title}\n   Categories: {categories}\n   Content: {content_preview}")
+
+            context = "\n\n=== USER'S SAVED CONTENT (use this to answer questions) ===\n" + "\n\n".join(context_parts)
+
+        system_prompt = f"""You are MindBase AI assistant. The user has saved various content (links, videos, articles, notes) to their personal knowledge base.
+
+When answering questions:
+1. If the user asks about their saved content, use the context provided below
+2. Reference specific items by title when relevant
+3. Be helpful and provide detailed answers based on what they've saved
+4. If you can't find relevant info in their saved content, say so honestly
+{context}"""
+
+        messages = [{"role": "system", "content": system_prompt}]
         messages.extend([{"role": m.role, "content": m.content} for m in history[-10:]])
         messages.append({"role": "user", "content": message})
         try:
             response = groq.chat.completions.create(model="llama-3.3-70b-versatile", messages=messages, max_tokens=500, temperature=0.7)
             return response.choices[0].message.content.strip()
-        except Exception:
-            return "Error processing request."
+        except Exception as e:
+            print(f"Chat error: {e}")
+            return "Sorry, I encountered an error processing your request. Please try again."
 
 
 ai_service = AIService()

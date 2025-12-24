@@ -15,6 +15,7 @@ import {
     Alert,
     Animated,
     Dimensions,
+    ScrollView,
 } from 'react-native';
 import { Swipeable, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Clipboard from '@react-native-clipboard/clipboard';
@@ -280,18 +281,20 @@ export default function HomeScreen() {
                 {items.length} saved items • Swipe left on item for actions
             </Text>
 
-            <FlatList
+            <ScrollView
                 horizontal
-                data={[
+                showsHorizontalScrollIndicator={false}
+                style={styles.categoryFilter}
+                contentContainerStyle={styles.categoryFilterContent}
+                nestedScrollEnabled={true}
+            >
+                {[
                     { id: 'all', name: 'All', color: '#6366F1', item_count: items.length },
                     { id: 'starred', name: '★ Starred', color: '#F59E0B', item_count: items.filter(i => i.is_starred).length },
                     ...categories
-                ]}
-                keyExtractor={(item) => item.id}
-                showsHorizontalScrollIndicator={false}
-                style={styles.categoryFilter}
-                renderItem={({ item }) => (
+                ].map((item) => (
                     <TouchableOpacity
+                        key={item.id}
                         style={[
                             styles.filterChip,
                             (selectedCategory === null && item.id === 'all') ||
@@ -312,8 +315,8 @@ export default function HomeScreen() {
                     >
                         <Text style={styles.filterText}>{item.name}</Text>
                     </TouchableOpacity>
-                )}
-            />
+                ))}
+            </ScrollView>
         </View>
     );
 
@@ -415,6 +418,9 @@ const styles = StyleSheet.create({
     },
     categoryFilter: {
         marginTop: 16,
+    },
+    categoryFilterContent: {
+        paddingRight: 20,
     },
     filterChip: {
         paddingHorizontal: 16,

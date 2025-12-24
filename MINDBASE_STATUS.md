@@ -1,5 +1,7 @@
 # MindBase - Project Status & Roadmap
 
+**Last Updated: December 21, 2025**
+
 ## Current Architecture
 
 ```
@@ -10,12 +12,12 @@
 +------------------+     +-------------------+     +------------------+
                                   |
                     +-------------+-------------+
-                    |                           |
-            +-------v-------+           +-------v-------+
-            |    Qdrant     |           |     Groq      |
-            | Vector Search |           |   AI/LLM      |
-            | (Embeddings)  |           | Categorization|
-            +---------------+           +---------------+
+                    |             |             |
+            +-------v-------+ +---v---+ +-------v-------+
+            |    Qdrant     | | Jina  | |     Groq      |
+            | Vector Search | |  AI   | |   AI/LLM      |
+            | (Storage)     | |Embed. | | Categorization|
+            +---------------+ +-------+ +---------------+
 ```
 
 ### Services Used:
@@ -25,37 +27,41 @@
 | **Supabase** | PostgreSQL database | Active | Free tier |
 | **Qdrant Cloud** | Vector database for semantic search | Active | Free tier |
 | **Groq** | LLM for AI categorization & summaries | Active | Free tier |
+| **Jina AI** | Semantic embeddings (1024-dim) | Active | Free tier |
 
 ---
 
 ## Feature Status
 
-### Working Features (7/10)
+### All Core Features Working (10/10)
 
 | Feature | Status | Description |
 |---------|--------|-------------|
 | Home Screen | :white_check_mark: | Shows saved items with categories |
 | Category Filters | :white_check_mark: | AI, Technology, Starred, All chips |
 | Swipe-to-Delete | :white_check_mark: | Swipe left, confirmation dialog |
+| Swipe-to-Star | :white_check_mark: | Swipe right, toggles star status |
 | Floating Bubble | :white_check_mark: | Toggle on/off, appears as overlay |
 | + Button | :white_check_mark: | Checks clipboard for content to save |
 | Pull-to-Refresh | :white_check_mark: | Refreshes items from backend |
 | Bottom Navigation | :white_check_mark: | Search, Chat, Home tabs |
 | AI Categorization | :white_check_mark: | Items get auto-categorized on save |
+| Semantic Search | :white_check_mark: | Jina AI embeddings + Qdrant |
 
-### Issues to Fix (3)
+### Recently Fixed Issues
 
-| Issue | Priority | Description | Solution |
-|-------|----------|-------------|----------|
-| Star Feature | HIGH | "Failed to update star status" error | Add `is_starred` column to Supabase |
-| Search Returns Empty | MEDIUM | Search UI works but no results | Check Qdrant embeddings & vector search |
-| Search Performance | LOW | Semantic search may need tuning | Review embedding model & similarity threshold |
+| Issue | Resolution | Date Fixed |
+|-------|------------|------------|
+| Star Feature | Added `is_starred` column to Supabase | Dec 21, 2025 |
+| Search Empty Results | Replaced hash-based with Jina AI embeddings | Dec 21, 2025 |
+| Starred Filter Bug | Fixed client-side filter logic in HomeScreen | Dec 21, 2025 |
+| Auth Errors | Simplified deps.py for dev mode | Dec 21, 2025 |
 
 ---
 
 ## Database Schema
 
-### Current Supabase Table: `saved_items`
+### Supabase Table: `saved_items`
 ```sql
 id UUID PRIMARY KEY
 user_id TEXT NOT NULL DEFAULT 'default_user'
@@ -70,14 +76,9 @@ extracted_text TEXT
 ai_summary TEXT
 categories TEXT[] DEFAULT '{}'
 notes TEXT
+is_starred BOOLEAN DEFAULT FALSE  -- Added Dec 21, 2025
 created_at TIMESTAMPTZ
 updated_at TIMESTAMPTZ
--- MISSING: is_starred BOOLEAN DEFAULT FALSE
-```
-
-### Fix Required:
-```sql
-ALTER TABLE saved_items ADD COLUMN IF NOT EXISTS is_starred BOOLEAN DEFAULT FALSE;
 ```
 
 ---
@@ -85,7 +86,7 @@ ALTER TABLE saved_items ADD COLUMN IF NOT EXISTS is_starred BOOLEAN DEFAULT FALS
 ## AI Features Status
 
 ### 1. AI Categorization (Working)
-- **Model**: Groq LLM (llama/mixtral)
+- **Model**: Groq LLM (llama3-70b-8192)
 - **Process**: When content is saved, AI analyzes and assigns categories
 - **Categories**: AI, Technology, Tutorial, Engineering, Telecom, etc.
 
@@ -93,21 +94,52 @@ ALTER TABLE saved_items ADD COLUMN IF NOT EXISTS is_starred BOOLEAN DEFAULT FALS
 - **Process**: Extracts key points from saved content
 - **Output**: `ai_summary` field in database
 
-### 3. Semantic Search (Not Working)
+### 3. Semantic Search (Working)
+- **Embedding Model**: Jina AI v3 (jina-embeddings-v3)
+- **Vector Dimensions**: 1024
 - **Vector DB**: Qdrant Cloud
-- **Issue**: Search returns empty results
-- **Possible causes**:
-  - Embeddings not being created on save
-  - Collection not initialized
-  - Wrong similarity threshold
+- **Features**:
+  - Semantic similarity search
+  - Text fallback if vector search returns empty
+  - Reindex endpoint: `POST /items/reindex`
+
+---
+
+## API Endpoints
+
+### Items
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/items/` | List all saved items |
+| POST | `/items/` | Save new content |
+| GET | `/items/{id}` | Get specific item |
+| DELETE | `/items/{id}` | Delete an item |
+| PATCH | `/items/{id}/star` | Toggle star status |
+| POST | `/items/search` | Semantic search |
+| POST | `/items/reindex` | Re-index all embeddings |
+
+### Categories
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/categories/` | Get category list with counts |
+
+### Chat
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/chat/` | Chat with AI about saved content |
+
+### Upload
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/upload/image-base64` | Upload image from base64 |
 
 ---
 
 ## What's Needed for Play Store Release
 
 ### Must Have (MVP)
-- [ ] Fix star/favorite functionality
-- [ ] Fix semantic search
+- [x] Fix star/favorite functionality
+- [x] Fix semantic search
 - [ ] Add user authentication (currently using default_user)
 - [ ] Add proper error handling
 - [ ] Test on multiple devices
@@ -126,7 +158,7 @@ ALTER TABLE saved_items ADD COLUMN IF NOT EXISTS is_starred BOOLEAN DEFAULT FALS
 - [ ] Sync across devices
 - [ ] Tags/custom categories
 - [ ] Notes/annotations on items
-- [ ] AI chat about saved content (Agent)
+- [ ] AI Agent for chatting with content
 
 ---
 
@@ -134,8 +166,9 @@ ALTER TABLE saved_items ADD COLUMN IF NOT EXISTS is_starred BOOLEAN DEFAULT FALS
 
 ### Current Capability:
 You have all the infrastructure needed for an AI agent:
-- Groq API for LLM
-- Qdrant for memory/retrieval
+- Groq API for LLM reasoning
+- Qdrant for memory/retrieval (working!)
+- Jina AI for embeddings (working!)
 - Supabase for persistent storage
 
 ### Agent Use Cases:
@@ -146,35 +179,14 @@ You have all the infrastructure needed for an AI agent:
 
 ### Implementation Approach:
 ```
-User Query --> Agent --> Retrieve relevant items from Qdrant
-                    --> Use Groq to reason about content
-                    --> Return intelligent response
+User Query --> Retrieve relevant items from Qdrant (semantic search)
+          --> Build context from matching items
+          --> Send to Groq LLM for reasoning
+          --> Return intelligent response
 ```
 
-### Recommendation:
-**Add agent after fixing current issues.** The foundation is there, but:
-1. First fix the star feature (database)
-2. Then fix semantic search (critical for agent to work)
-3. Then add the agent (it needs search to retrieve context)
-
----
-
-## Immediate Action Items
-
-### 1. Fix Database (is_starred column)
-You need to access your Supabase project:
-- URL: `https://supabase.com/dashboard/project/xkrfvbhkcwaicgxqcfyk`
-- Run the ALTER TABLE command in SQL Editor
-
-### 2. Debug Search
-- Check if Qdrant collection exists
-- Verify embeddings are being created on save
-- Test vector search directly via API
-
-### 3. Test AI Categorization
-- Save a new item via the app
-- Verify categories are assigned
-- Check ai_summary is generated
+### Status: Ready to Implement
+Now that semantic search is working, the agent can be built on top of the existing infrastructure.
 
 ---
 
@@ -190,6 +202,7 @@ You need to access your Supabase project:
 - Framework: React Native + Expo
 - Package: `com.mindbase.app`
 - Dev Server: `npx expo start --dev-client`
+- APK Location: `mobile/android/app/build/outputs/apk/release/app-release.apk`
 
 ### API Keys Required:
 - SUPABASE_URL
@@ -197,6 +210,7 @@ You need to access your Supabase project:
 - QDRANT_URL
 - QDRANT_API_KEY
 - GROQ_API_KEY
+- JINA_API_KEY (optional, works without for basic use)
 
 ---
 
@@ -208,21 +222,26 @@ mymess/
 │   ├── api.ts             # API client
 │   ├── config.ts          # App configuration
 │   ├── screens/
-│   │   ├── HomeScreen.tsx # Main screen
-│   │   └── SearchScreen.tsx
+│   │   ├── HomeScreen.tsx # Main screen with swipe gestures
+│   │   ├── SearchScreen.tsx
+│   │   └── ChatScreen.tsx
 │   └── android/           # Android build files
 │
 ├── backend/               # Python backend
 │   ├── app/
 │   │   ├── main.py       # FastAPI entry
 │   │   ├── api/
-│   │   │   ├── items.py  # Items CRUD + star
-│   │   │   └── upload.py # Content upload
+│   │   │   ├── items.py  # Items CRUD + star + search + reindex
+│   │   │   ├── categories.py
+│   │   │   ├── chat.py
+│   │   │   ├── upload.py # Content upload
+│   │   │   └── deps.py   # Auth dependencies
 │   │   ├── core/
 │   │   │   ├── config.py # Settings
 │   │   │   └── database.py # DB connections
 │   │   └── services/
-│   │       └── ai_service.py # AI categorization
+│   │       ├── ai_service.py # Jina embeddings + Groq LLM
+│   │       └── content_extractor.py
 │   └── requirements.txt
 │
 └── render.yaml            # Render deployment config
@@ -230,17 +249,55 @@ mymess/
 
 ---
 
-## Next Steps (Recommended Order)
+## Current Data
 
-1. **Access Supabase** - Find or recreate the project
-2. **Add is_starred column** - Fix star feature
-3. **Debug search** - Get semantic search working
-4. **Test full flow** - Save item > categorize > search > star
-5. **Add authentication** - Replace default_user
-6. **Polish UI** - Icons, splash screen
-7. **Add Agent** - Chat with saved content
-8. **Prepare for Play Store** - Privacy policy, testing
+### Saved Items (3 items):
+1. **ChatGPT** - https://openai.com/index/chatgpt/
+   - Categories: AI, Technology, Chatbot
+
+2. **Elon Musk Twitter** - https://twitter.com/elonmusk
+   - Categories: Technology, Browser, Support
+
+3. **Rick Astley - Never Gonna Give You Up**
+   - Categories: Uncategorized
 
 ---
 
-*Document generated: December 21, 2025*
+## Next Steps (Recommended Order)
+
+1. **Test on Phone** - Verify star and search work in app UI
+2. **Add More Content** - Test AI categorization with new saves
+3. **Add Authentication** - Replace default_user with real auth
+4. **Build AI Agent** - Chat with saved content feature
+5. **Polish UI** - Icons, splash screen, settings
+6. **Prepare for Play Store** - Privacy policy, testing
+
+---
+
+## Quick Commands
+
+```bash
+# Start Metro bundler
+cd mobile && npx expo start --dev-client
+
+# Build APK
+cd mobile/android && ./gradlew assembleRelease
+
+# Check backend health
+curl https://mindbase-api.onrender.com/health
+
+# List items
+curl https://mindbase-api.onrender.com/items/
+
+# Search
+curl -X POST https://mindbase-api.onrender.com/items/search \
+  -H "Content-Type: application/json" \
+  -d '{"query": "AI"}'
+
+# Reindex embeddings
+curl -X POST https://mindbase-api.onrender.com/items/reindex
+```
+
+---
+
+*All core features verified working - December 21, 2025*

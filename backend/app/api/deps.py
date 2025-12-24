@@ -34,13 +34,9 @@ async def get_current_user(
         parts = authorization.split(" ")
         if len(parts) == 2 and parts[0].lower() == "bearer":
             token_value = parts[1]
-            # Check if it's a device ID
-            if token_value.startswith("device_"):
-                user_id = token_value  # Use full "device_xxx" as user_id
-            else:
-                # Could be a Supabase token - for now, use as-is or extract user
-                # TODO: Verify Supabase JWT and extract user ID
-                user_id = f"token_{token_value[:16]}"  # Use first 16 chars as ID
+            # Use token value directly as user_id
+            # This supports both device IDs and special IDs like 'default_user'
+            user_id = token_value
 
     return DevUser(user_id)
 

@@ -54,7 +54,7 @@ class ApiService {
         if (this.token) {
             headers['Authorization'] = `Bearer ${this.token}`;
         } else if (this.deviceId) {
-            headers['Authorization'] = `Bearer device_${this.deviceId}`;
+            headers['Authorization'] = `Bearer ${this.deviceId}`;
         }
 
         const response = await fetch(`${this.baseUrl}${endpoint}`, {

@@ -66,32 +66,14 @@ export default function App() {
   // DEV MODE: Skip Supabase auth but use unique device ID for data isolation
   const DEV_MODE = true;
 
-  // Generate or retrieve unique device ID for user isolation
+  // For now, use a shared device ID so all data is accessible
+  // TODO: Re-enable unique device IDs once proper user auth is implemented
   const initializeDeviceId = async () => {
-    try {
-      let deviceId = await AsyncStorage.getItem('deviceId');
-      if (!deviceId) {
-        // Generate a UUID-like unique ID
-        deviceId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-          const r = Math.random() * 16 | 0;
-          const v = c === 'x' ? r : (r & 0x3 | 0x8);
-          return v.toString(16);
-        });
-        await AsyncStorage.setItem('deviceId', deviceId);
-        console.log('Generated new device ID:', deviceId);
-      } else {
-        console.log('Using existing device ID:', deviceId);
-      }
-      // Set device ID on API for user isolation
-      api.setDeviceId(deviceId);
-      return deviceId;
-    } catch (error) {
-      console.error('Failed to initialize device ID:', error);
-      // Fallback to a random ID if AsyncStorage fails
-      const fallbackId = Math.random().toString(36).substring(2, 15);
-      api.setDeviceId(fallbackId);
-      return fallbackId;
-    }
+    // Use 'default_user' to match existing data - this is temporary for testing
+    const deviceId = 'default_user';
+    api.setDeviceId(deviceId);
+    console.log('Using shared device ID for testing:', deviceId);
+    return deviceId;
   };
 
   useEffect(() => {

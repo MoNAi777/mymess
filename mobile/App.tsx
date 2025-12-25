@@ -64,7 +64,7 @@ export default function App() {
   const [showBubbleSettings, setShowBubbleSettings] = useState(false);
 
   // DEV MODE: Skip Supabase auth but use unique device ID for data isolation
-  const DEV_MODE = true;
+  const DEV_MODE = false;
 
   // For now, use a shared device ID so all data is accessible
   // TODO: Re-enable unique device IDs once proper user auth is implemented

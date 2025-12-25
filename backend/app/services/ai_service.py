@@ -3,7 +3,7 @@ MindBase Backend - AI Service
 Handles categorization, embeddings, and chat using Groq + Jina AI
 """
 from typing import List, Dict, Any, Optional
-from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
+from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue, PayloadSchemaType
 import uuid
 import httpx
 import os
@@ -31,6 +31,15 @@ class AIService:
                     collection_name=COLLECTION_NAME,
                     vectors_config=VectorParams(size=EMBEDDING_DIM, distance=Distance.COSINE)
                 )
+            # Ensure user_id index exists for filtering
+            try:
+                qdrant.create_payload_index(
+                    collection_name=COLLECTION_NAME,
+                    field_name="user_id",
+                    field_schema=PayloadSchemaType.KEYWORD
+                )
+            except Exception:
+                pass  # Index might already exist
         except Exception as e:
             print(f"Error ensuring collection: {e}")
 
@@ -108,12 +117,20 @@ class AIService:
     async def search_similar(self, query: str, limit: int = 10, user_id: str = None) -> List[Dict[str, Any]]:
         query_embedding = await self.generate_embedding(query)
         try:
-            params = {"collection_name": COLLECTION_NAME, "query_vector": query_embedding, "limit": limit, "score_threshold": 0.3}
+            query_filter = None
             if user_id:
-                params["query_filter"] = Filter(must=[FieldCondition(key="user_id", match=MatchValue(value=user_id))])
-            results = qdrant.search(**params)
-            return [{"item_id": r.payload.get("item_id"), "score": r.score, **r.payload} for r in results]
-        except Exception:
+                query_filter = Filter(must=[FieldCondition(key="user_id", match=MatchValue(value=user_id))])
+
+            results = qdrant.query_points(
+                collection_name=COLLECTION_NAME,
+                query=query_embedding,
+                limit=limit,
+                score_threshold=0.1,  # Lowered threshold for better recall
+                query_filter=query_filter
+            )
+            return [{"item_id": r.payload.get("item_id"), "score": r.score, **r.payload} for r in results.points]
+        except Exception as e:
+            print(f"Search error: {e}")
             return []
 
     async def reindex_all_items(self, items: List[Dict[str, Any]]) -> int:
@@ -136,9 +153,11 @@ class AIService:
                 description = item.get('description', '')[:200] if item.get('description') else ''
                 categories = ', '.join(item.get('categories', [])) if item.get('categories') else ''
                 platform = item.get('source_platform', '')
+                source_url = item.get('source_url', '')
 
                 content_preview = summary or extracted or description or 'No content preview'
-                context_parts.append(f"{i}. [{platform}] {title}\n   Categories: {categories}\n   Content: {content_preview}")
+                url_info = f"\n   URL: {source_url}" if source_url else ""
+                context_parts.append(f"{i}. [{platform}] {title}\n   Categories: {categories}\n   Content: {content_preview}{url_info}")
 
             context = "\n\n=== USER'S SAVED CONTENT (use this to answer questions) ===\n" + "\n\n".join(context_parts)
 
@@ -149,6 +168,7 @@ When answering questions:
 2. Reference specific items by title when relevant
 3. Be helpful and provide detailed answers based on what they've saved
 4. If you can't find relevant info in their saved content, say so honestly
+5. IMPORTANT: When mentioning items, include the source URL if available so the user can access the original content
 {context}"""
 
         messages = [{"role": "system", "content": system_prompt}]

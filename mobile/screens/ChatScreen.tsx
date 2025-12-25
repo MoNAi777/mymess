@@ -13,12 +13,14 @@ import {
     Platform,
     StyleSheet,
     ActivityIndicator,
+    Linking,
 } from 'react-native';
-import { api, ChatMessage } from '../api';
+import { api, ChatMessage, SavedItem } from '../api';
 
 interface Message extends ChatMessage {
     id: string;
     loading?: boolean;
+    relatedItems?: SavedItem[];
 }
 
 export default function ChatScreen() {
@@ -62,7 +64,12 @@ export default function ChatScreen() {
 
             setMessages((prev) =>
                 prev.map((m) =>
-                    m.loading ? { ...m, content: response.response, loading: false } : m
+                    m.loading ? {
+                        ...m,
+                        content: response.response,
+                        loading: false,
+                        relatedItems: response.related_items || [],
+                    } : m
                 )
             );
         } catch (error) {
@@ -78,8 +85,15 @@ export default function ChatScreen() {
         }
     };
 
+    const openUrl = (url: string) => {
+        if (url) {
+            Linking.openURL(url).catch((err) => console.log('Error opening URL:', err));
+        }
+    };
+
     const renderMessage = ({ item }: { item: Message }) => {
         const isUser = item.role === 'user';
+        const hasRelatedItems = item.relatedItems && item.relatedItems.length > 0;
 
         return (
             <View
@@ -91,9 +105,33 @@ export default function ChatScreen() {
                 {item.loading ? (
                     <ActivityIndicator color="#8b8bf5" />
                 ) : (
-                    <Text style={[styles.messageText, isUser && styles.userMessageText]}>
-                        {item.content}
-                    </Text>
+                    <>
+                        <Text style={[styles.messageText, isUser && styles.userMessageText]}>
+                            {item.content}
+                        </Text>
+                        {hasRelatedItems && (
+                            <View style={styles.relatedItemsContainer}>
+                                <Text style={styles.relatedItemsTitle}>Sources:</Text>
+                                {item.relatedItems!.map((relItem, index) => (
+                                    <TouchableOpacity
+                                        key={relItem.id || index}
+                                        style={styles.relatedItem}
+                                        onPress={() => relItem.source_url && openUrl(relItem.source_url)}
+                                        disabled={!relItem.source_url}
+                                    >
+                                        <Text style={styles.relatedItemTitle} numberOfLines={1}>
+                                            {relItem.title || 'Untitled'}
+                                        </Text>
+                                        {relItem.source_url && (
+                                            <Text style={styles.relatedItemUrl} numberOfLines={1}>
+                                                {relItem.source_url}
+                                            </Text>
+                                        )}
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+                    </>
                 )}
             </View>
         );
@@ -224,5 +262,33 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 20,
         fontWeight: 'bold',
+    },
+    relatedItemsContainer: {
+        marginTop: 12,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: '#333',
+    },
+    relatedItemsTitle: {
+        fontSize: 12,
+        color: '#888',
+        marginBottom: 8,
+        fontWeight: '600',
+    },
+    relatedItem: {
+        backgroundColor: '#0f0f1a',
+        padding: 10,
+        borderRadius: 8,
+        marginBottom: 6,
+    },
+    relatedItemTitle: {
+        fontSize: 13,
+        color: '#8b8bf5',
+        fontWeight: '500',
+    },
+    relatedItemUrl: {
+        fontSize: 11,
+        color: '#666',
+        marginTop: 2,
     },
 });

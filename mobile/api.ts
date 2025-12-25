@@ -98,7 +98,7 @@ class ApiService {
     }
 
     // Chat with AI
-    async chat(message: string, history: ChatMessage[] = []): Promise<{ response: string }> {
+    async chat(message: string, history: ChatMessage[] = []): Promise<{ response: string; related_items: SavedItem[] }> {
         return this.fetch('/chat/', {
             method: 'POST',
             body: JSON.stringify({
